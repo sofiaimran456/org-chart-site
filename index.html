@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aga Khan Social Welfare Board</title>
+
+  <style>
+    :root {
+      --orange: #ea580c;
+      --orange-dark: #9a3412;
+      --orange-light: #ffedd5;
+      --bg: #fff7ed;
+      --line: #fdba74;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+    }
+
+    header {
+      background: linear-gradient(135deg, var(--orange-dark), var(--orange));
+      color: white;
+      padding: 24px;
+    }
+
+    header h1 {
+      margin: 0;
+    }
+
+    .toolbar {
+      background: white;
+      padding: 15px;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      background: var(--orange-light);
+      color: var(--orange-dark);
+      border: none;
+      padding: 10px 16px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: bold;
+      margin-right: 10px;
+    }
+
+    .status-text {
+      color: #7c2d12;
+      font-size: 13px;
+      margin-left: auto;
+    }
+
+    .chart-shell {
+      overflow: auto;
+      padding: 30px;
+    }
+
+    .org-chart {
+      display: flex;
+      justify-content: center;
+    }
+
+    .org-chart ul {
+      position: relative;
+      padding-top: 20px;
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      padding-left: 0;
+    }
+
+    .org-chart li {
+      list-style: none;
+      text-align: center;
+      position: relative;
+      padding-top: 20px;
+    }
+
+    .org-chart li::before,
+    .org-chart li::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 50%;
+      border-top: 2px solid var(--line);
+      width: 50%;
+    }
+
+    .org-chart li::after {
+      right: auto;
+      left: 50%;
+      border-left: 2px solid var(--line);
+      height: 20px;
+    }
+
+    .org-chart li:only-child::before,
+    .org-chart li:only-child::after {
+      display: none;
+    }
+
+    .org-chart ul ul::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 50%;
+      height: 20px;
+      border-left: 2px solid var(--line);
+    }
+
+    .node-card {
+      background: white;
+      border-radius: 16px;
+      border-top: 6px solid var(--orange);
+      padding: 12px;
+      min-width: 220px;
+      text-align: left;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    }
+
+    .node-name {
+      font-weight: bold;
+      font-size: 15px;
+    }
+
+    .node-role {
+      margin-top: 5px;
+      font-size: 13px;
+      color: #555;
+    }
+
+    .toggle-badge {
+      float: right;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--orange-light);
+      color: var(--orange-dark);
+      text-align: center;
+      line-height: 24px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .collapsed>ul {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <h1>Aga Khan Social Welfare Board</h1>
+    <p>Organization Structure and Portfolio View</p>
+  </header>
+
+  <div class="toolbar">
+    <button id="expandAllBtn">Expand All</button>
+    <button id="collapseAllBtn">Collapse All</button>
+    <span id="statusText" class="status-text">Loading data...</span>
+  </div>
+
+  <div class="chart-shell">
+    <div id="chart" class="org-chart"></div>
+  </div>
+
+  <script>
+    const SHEET_ID = "1WfIlaQ6QG_8pvqFs3sJL-W3x_Zv51-ZYcBWYGTkCP1k";
+    const SHEET_GID = "0";
+    const REFRESH_INTERVAL_MS = 60000;
+    let currentData = null;
+
+    async function loadOrgChart() {
+      setStatus("Refreshing...");
+
+      try {
+        const rows = await loadSheetRowsViaJsonp();
+
+        currentData = buildTree(rows);
+        renderChart(currentData);
+
+        const now = new Date();
+        setStatus(`Updated ${now.toLocaleTimeString()}`);
+      } catch (error) {
+        setStatus("Failed to refresh data");
+        console.error(error);
+      }
+    }
+
+    function renderChart(data) {
+
+      const chart = document.getElementById("chart");
+
+      chart.innerHTML = "";
+
+      if (!data) {
+        chart.textContent = "No data available.";
+        return;
+      }
+
+      const ul = document.createElement("ul");
+
+      ul.appendChild(createNode(data));
+
+      chart.appendChild(ul);
+    }
+
+    function createNode(node) {
+
+      const li = document.createElement("li");
+
+      const card = document.createElement("div");
+      card.className = "node-card";
+
+      const hasChildren =
+        node.children &&
+        node.children.length > 0;
+
+      card.innerHTML = `
+        <div class="node-name">
+        ${escapeHtml(node.name || "")}
+            ${hasChildren
+          ? '<span class="toggle-badge">−</span>'
+          : ''}
+        </div>
+
+        <div class="node-role">
+        ${escapeHtml(node.title || "")}
+        </div>
+    `;
+
+      li.appendChild(card);
+
+      if (hasChildren) {
+
+        const ul = document.createElement("ul");
+
+        node.children.forEach(child => {
+          ul.appendChild(createNode(child));
+        });
+
+        li.appendChild(ul);
+
+        card.querySelector(".toggle-badge")
+          .addEventListener("click", (e) => {
+
+            e.stopPropagation();
+
+            li.classList.toggle("collapsed");
+
+            e.target.textContent =
+              li.classList.contains("collapsed")
+                ? "+"
+                : "−";
+          });
+      }
+
+      return li;
+    }
+
+    function loadSheetRowsViaJsonp() {
+      return new Promise((resolve, reject) => {
+        const callbackName = `sheetJsonp_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+        const script = document.createElement("script");
+
+        const cleanup = () => {
+          delete window[callbackName];
+          script.remove();
+        };
+
+        window[callbackName] = (response) => {
+          try {
+            const table = response && response.table;
+            const cols = (table && table.cols) || [];
+            const rows = (table && table.rows) || [];
+
+            const headers = cols.map((col) => String((col && col.label) || "").trim());
+            const data = rows.map((row) => {
+              const cells = row && row.c ? row.c : [];
+              const obj = {};
+              headers.forEach((header, index) => {
+                const cell = cells[index];
+                obj[header] = cell && cell.v !== null && cell.v !== undefined ? String(cell.v) : "";
+              });
+              return obj;
+            });
+
+            cleanup();
+            resolve(data);
+          } catch (error) {
+            cleanup();
+            reject(error);
+          }
+        };
+
+        script.onerror = () => {
+          cleanup();
+          reject(new Error("Failed to load Google Sheets JSONP"));
+        };
+
+        const url =
+          `https://docs.google.com/spreadsheets/d/${encodeURIComponent(SHEET_ID)}/gviz/tq` +
+          `?gid=${encodeURIComponent(SHEET_GID)}` +
+          `&headers=1&tqx=out:json;responseHandler:${callbackName}`;
+
+        script.src = url;
+        document.head.appendChild(script);
+      });
+    }
+
+    function buildTree(rows) {
+      const records = rows.map((row) => ({
+        id: String(row.id || "").trim(),
+        parentId: String(row.parentId || "").trim(),
+        name: String(row.name || "").trim(),
+        title: String(row.title || "").trim(),
+        children: []
+      }));
+
+      const map = {};
+      records.forEach((record) => {
+        if (record.id) {
+          map[record.id] = record;
+        }
+      });
+
+      let root = null;
+
+      records.forEach((record) => {
+        if (!record.id) {
+          return;
+        }
+
+        if (record.parentId && map[record.parentId]) {
+          map[record.parentId].children.push(record);
+          return;
+        }
+
+        if (!root) {
+          root = record;
+        }
+      });
+
+      cleanChildren(root);
+      return root;
+    }
+
+    function cleanChildren(node) {
+
+      if (!node) {
+        return;
+      }
+
+      if (!node.children.length) {
+
+        delete node.children;
+        return;
+      }
+
+      node.children.forEach(cleanChildren);
+    }
+
+    function setStatus(message) {
+      document.getElementById("statusText").textContent = message;
+    }
+
+    function escapeHtml(value) {
+      return value
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    document
+      .getElementById("expandAllBtn")
+      .addEventListener("click", () => {
+
+        document
+          .querySelectorAll(".collapsed")
+          .forEach(el => el.classList.remove("collapsed"));
+
+        document
+          .querySelectorAll(".toggle-badge")
+          .forEach(el => el.textContent = "−");
+      });
+
+    document
+      .getElementById("collapseAllBtn")
+      .addEventListener("click", () => {
+
+        document.querySelectorAll(".org-chart li")
+          .forEach(li => {
+
+            if (li.querySelector("ul")) {
+              li.classList.add("collapsed");
+            }
+          });
+
+        document
+          .querySelectorAll(".toggle-badge")
+          .forEach(el => el.textContent = "+");
+      });
+
+    loadOrgChart();
+
+    setInterval(loadOrgChart, REFRESH_INTERVAL_MS);
+
+  </script>
+
+</body>
+
+</html>
