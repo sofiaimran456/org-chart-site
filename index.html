@@ -128,6 +128,10 @@
     .node-name {
       font-weight: bold;
       font-size: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
     }
 
     .node-role {
@@ -137,16 +141,19 @@
     }
 
     .toggle-badge {
-      float: right;
       width: 24px;
       height: 24px;
+      border: 1px solid #fdba74;
       border-radius: 50%;
       background: var(--orange-light);
       color: var(--orange-dark);
-      text-align: center;
-      line-height: 24px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       cursor: pointer;
       font-weight: bold;
+      flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
     }
 
     .collapsed>ul {
@@ -204,6 +211,11 @@
       .node-card {
         min-width: 0;
         width: min(100%, 340px);
+      }
+
+      .toggle-badge {
+        width: 30px;
+        height: 30px;
       }
     }
   </style>
@@ -283,7 +295,7 @@
         <div class="node-name">
         ${escapeHtml(node.name || "")}
             ${hasChildren
-          ? '<span class="toggle-badge">−</span>'
+          ? '<button type="button" class="toggle-badge" aria-label="Toggle children" aria-expanded="false">+</button>'
           : ''}
         </div>
 
@@ -296,6 +308,8 @@
 
       if (hasChildren) {
 
+        li.classList.add("collapsed");
+
         const ul = document.createElement("ul");
 
         node.children.forEach(child => {
@@ -304,18 +318,25 @@
 
         li.appendChild(ul);
 
-        card.querySelector(".toggle-badge")
-          .addEventListener("click", (e) => {
+        const toggleBadge = card.querySelector(".toggle-badge");
 
-            e.stopPropagation();
+        toggleBadge.addEventListener("click", (e) => {
+          e.stopPropagation();
+          toggleNodeState(li, toggleBadge);
+        });
 
-            li.classList.toggle("collapsed");
+        // On phones, tapping the card area is easier than hitting the small toggle badge.
+        card.addEventListener("click", (e) => {
+          if (!window.matchMedia("(max-width: 768px)").matches) {
+            return;
+          }
 
-            e.target.textContent =
-              li.classList.contains("collapsed")
-                ? "+"
-                : "−";
-          });
+          if (e.target.closest(".toggle-badge")) {
+            return;
+          }
+
+          toggleNodeState(li, toggleBadge);
+        });
       }
 
       return li;
@@ -427,6 +448,13 @@
       document.getElementById("statusText").textContent = message;
     }
 
+    function toggleNodeState(li, badge) {
+      li.classList.toggle("collapsed");
+      const isCollapsed = li.classList.contains("collapsed");
+      badge.textContent = isCollapsed ? "+" : "−";
+      badge.setAttribute("aria-expanded", String(!isCollapsed));
+    }
+
     function setAllNodesCollapsed(collapsed) {
       document
         .querySelectorAll(".org-chart li")
@@ -440,6 +468,7 @@
           const badge = li.querySelector(".toggle-badge");
           if (badge) {
             badge.textContent = collapsed ? "+" : "−";
+            badge.setAttribute("aria-expanded", String(!collapsed));
           }
         });
     }
