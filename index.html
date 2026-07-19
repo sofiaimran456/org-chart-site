@@ -152,6 +152,60 @@
     .collapsed>ul {
       display: none;
     }
+
+    @media (max-width: 768px) {
+      header {
+        padding: 16px;
+      }
+
+      header h1 {
+        font-size: 24px;
+      }
+
+      .toolbar {
+        padding: 12px;
+        gap: 8px;
+      }
+
+      .status-text {
+        margin-left: 0;
+        width: 100%;
+      }
+
+      .chart-shell {
+        padding: 12px;
+      }
+
+      .org-chart {
+        justify-content: flex-start;
+      }
+
+      .org-chart ul {
+        display: block;
+        padding-top: 0;
+      }
+
+      .org-chart li {
+        padding-top: 10px;
+      }
+
+      .org-chart li::before,
+      .org-chart li::after,
+      .org-chart ul ul::before {
+        display: none;
+      }
+
+      .org-chart ul ul {
+        margin-left: 14px;
+        padding-left: 10px;
+        border-left: 2px solid var(--line);
+      }
+
+      .node-card {
+        min-width: 0;
+        width: min(100%, 340px);
+      }
+    }
   </style>
 </head>
 
@@ -186,6 +240,7 @@
 
         currentData = buildTree(rows);
         renderChart(currentData);
+        setAllNodesCollapsed(true);
 
         const now = new Date();
         setStatus(`Updated ${now.toLocaleTimeString()}`);
@@ -372,6 +427,23 @@
       document.getElementById("statusText").textContent = message;
     }
 
+    function setAllNodesCollapsed(collapsed) {
+      document
+        .querySelectorAll(".org-chart li")
+        .forEach((li) => {
+          if (!li.querySelector("ul")) {
+            return;
+          }
+
+          li.classList.toggle("collapsed", collapsed);
+
+          const badge = li.querySelector(".toggle-badge");
+          if (badge) {
+            badge.textContent = collapsed ? "+" : "−";
+          }
+        });
+    }
+
     function escapeHtml(value) {
       return value
         .replaceAll("&", "&amp;")
@@ -384,31 +456,13 @@
     document
       .getElementById("expandAllBtn")
       .addEventListener("click", () => {
-
-        document
-          .querySelectorAll(".collapsed")
-          .forEach(el => el.classList.remove("collapsed"));
-
-        document
-          .querySelectorAll(".toggle-badge")
-          .forEach(el => el.textContent = "−");
+        setAllNodesCollapsed(false);
       });
 
     document
       .getElementById("collapseAllBtn")
       .addEventListener("click", () => {
-
-        document.querySelectorAll(".org-chart li")
-          .forEach(li => {
-
-            if (li.querySelector("ul")) {
-              li.classList.add("collapsed");
-            }
-          });
-
-        document
-          .querySelectorAll(".toggle-badge")
-          .forEach(el => el.textContent = "+");
+        setAllNodesCollapsed(true);
       });
 
     loadOrgChart();
